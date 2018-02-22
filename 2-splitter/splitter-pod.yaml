@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 apiVersion: v1
 kind: Pod
 metadata:
@@ -16,4 +17,24 @@ spec:
   volumes:
     - name: splitter-config
       configMap:
+=======
+apiVersion: v1
+kind: Pod
+metadata:
+  name: splitter-pod
+spec:
+  containers:
+    # This is where the application container would go, for example
+    # - name: some-name
+    #   image: some-image
+    # This is the ambassador container
+    - name: splitter
+      image: nginx
+      volumeMounts:
+      - name: splitter-config
+        mountPath: /etc/nginx/conf.d
+  volumes:
+    - name: splitter-config
+      configMap:
+>>>>>>> bd5db234c0f3cbd8a0d25df2dc76d3dcd516f1dc
         name: splitter-config
