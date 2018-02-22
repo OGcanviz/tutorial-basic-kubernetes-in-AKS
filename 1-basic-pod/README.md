@@ -1,7 +1,8 @@
-# Basic Pod: Creating a Simple Load Balanced Web Server in Nginx with Kubernetes on Azure (AKS)#
+# Basic Pod: Creating a Simple Web Server in Nginx with Kubernetes on Azure (AKS)#
 
-In this lab you'll learn step-by-step how to deploy a pod into Azure Container Service / Managed Kubernetics (AKS) that serves simple HTTP requests through an Nginx load balancer.
+In this lab you'll learn step-by-step how to deploy a pod into Azure Container Service / Managed Kubernetes (AKS) that serves simple HTTP requests through an Nginx load balancer.
 
+![](./images/1-basic-pod.png)
 ## Prerequisites
 
 In order to run the samples in this lab,you will need the following:
@@ -10,7 +11,8 @@ In order to run the samples in this lab,you will need the following:
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/overview?view=azure-cli-latest "Azure CLI") installed
 - [Curl](https://curl.haxx.se/download.html "Curl") command line tool installed (for downloading kubectl as well as testing samples in this lab)
 - [Kubernetes CLI (kubectl)](https://kubernetes.io/docs/tasks/tools/install-kubectl/ "Kubernetes CLI (kubectl)") installed
-- **Resource Group** and **Container Service (AKS)** created in the [Microsoft Azure Portal](https://portal.azure.com "Microsoft Azure Portal") to run samples in.
+- A new **Resource Group** and **Container Service (AKS)** created in the [Microsoft Azure Portal](https://portal.azure.com "Microsoft Azure Portal") to run samples in.
+- Open a Command Prompt window (with an active PATH environment variable pointing to Azure CLI and Kubernetes CLI)
 
 ## First time set up ##
 
@@ -26,16 +28,16 @@ If you are using the Kubernetes CLI on a windows machine, it expects a ```config
 
 For instance, if your user name is TestUser, you may find the kubectl ```config``` file in ```C:\Users\TestUser\.kube```
 
-**Optional:** If your Kubernetes configuration file is located elsewhere, in order for the Kuberneter CLI (kubectl) to find your configuration, you need to add the above path (including the 'config' file name) to the ```KUBECONFIG``` environment variable, as such:
+**Optionally:** If your Kubernetes configuration file is located elsewhere, in order for the Kuberneter CLI (kubectl) to find your configuration, you need to add the above path (including the 'config' file name) to the ```KUBECONFIG``` environment variable in a Command Prompt window, as such:
 
     SET KUBECONFIG=c:\pathtokubeconfig\config
 
  
 **Logging into Azure from the Command Line**
 
-In order for the kubectl statements below to be fired against the correct Azure Kubernetes (AKS) instance, we need to link your Azure subscription to the local Kubernetes configuration.
+In order for the ```kubectl``` statements below to be fired against the correct Azure Kubernetes (AKS) instance, we need to link your Azure subscription to the local Kubernetes configuration.
 
-First you need to sign in,  by entering the following command in a CMD window:
+First you need to sign in,  by entering the following command in a Command Prompt window:
 
 
     az login
@@ -46,7 +48,9 @@ This will result in the following output:
     
 Now, you need to open a browser and go to ```https://aka.ms/devicelogin``` and type in the code as returned from the ```az login``` command: ```B9R2CY8ZP```
 
-This will authenticate your device again Azure and a response similar should appear in your CMD window:
+![](./images/DeviceLogin.png)
+
+This will authenticate your device again Azure and a response similar should appear in your Command Prompt window:
 
     [
       {
@@ -55,9 +59,9 @@ This will authenticate your device again Azure and a response similar should app
 	    "isDefault": true,
 	    "name": "CanvizDev",
 	    "state": "Enabled",
-	    "tenantId": "3dad2b09-9e66-4eb8-9bef-9f44544b0e74",
+	    "tenantId": "3dad2b09-9e66-4eb8-9bef-9f44544b0222",
 	    "user": {
-	      "name": "Manfredw@canviz.com",
+	      "name": "testuser@canviz.com",
 	      "type": "user"
 	    }
       }
@@ -84,14 +88,14 @@ If successful, this will result in the following output:
 
 **Optionally: Set the context, if you have used other Kubernetes clusters before**
 
-If you have been developing against a local or a different Kubernetes cluster, your current kubectl configuration may point to a different cluster. To correct this, please use the following command:
+If you have been developing against a local or a different Kubernetes cluster, your current ```kubectl``` configuration may point to a different cluster. To correct this, please use the following command:
 
     kubectl config set-context TestKub1
 
 
 **Verify the correct Kubernetes cluster**
 
-In order for us to verify that we are talking to the correct Kubernetes cluster, we can use the following command:
+In order for us to verify that we are indeed talking to the correct Kubernetes cluster, we can use the following command:
 
     kubectl cluster-info
 
@@ -102,22 +106,25 @@ The output of this command should look similar to this:
     KubeDNS is running at https://testkub1-77a9ac84.hcp.eastus.azmk8s.io:443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
     kubernetes-dashboard is running at https://testkub1-77a9ac84.hcp.eastus.azmk8s.io:443/api/v1/namespaces/kube-system/services/kubernetes-dashboard/proxy
     
+If the URLs in the output point to localhost, please use ```kubectl config set-context``` command to change the context to the correct cluster.
     
 ## 1. Create an Nginx configuration file
 
+![](./images/nginx.png)
+
 Nginx is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server. It is offered as part of Kubernetes as an advanced Layer 7 load‑balancing solution for exposing Kubernetes services to the Internet.
 
-The way nginx and its modules work is determined in the configuration file. By default, the configuration file is named nginx.conf and placed in the directory /usr/local/nginx/conf , /etc/nginx , or /usr/local/etc/nginx
+The way Nginx and its modules work is determined in the configuration file. By default, the configuration file is named ```nginx.conf``` and placed in the directory ```/usr/local/nginx/conf``` , ```/etc/nginx``` , or ```/usr/local/etc/nginx```
 
-### 1.1 Default Configuration
+### 1.1 Creating an Nginx pod with Default Configuration
 
-Firing up an Nginx instance within Kubernetes is easy:
+Firing up a default Nginx instance within Kubernetes is easy:
 
 ``` kubectl run my-nginx --image=nginx --replicas=2 --port=80 ```
 
-The ```kubectl run``` line above will create two nginx pods listening on port 80. It will also create a deployment named ```my-nginx``` to ensure that there are always two pods running.
+The ```kubectl run``` line above will create two nginx pods listening on port 80. It will also **create** a deployment named ```my-nginx``` to ensure that there are always two pods running.
 
-At this point, the two pods are not yet accessible from the outside world. For that we need to create a deployment:
+At this point, the two pods are not yet accessible from the outside world. For that we need to **expose** a deployment:
 
 ``` kubectl expose deployment my-nginx --port=80 --type=LoadBalancer ```
 
@@ -140,7 +147,7 @@ And once the IP address has become available:
     my-nginx   LoadBalancer   	10.0.179.76   	13.92.209.60   	80:31102/TCP	6m
     
 
-Now, we can use a cURL statement to see if we get a response back from our Nginx instance:
+Now, we can use a cURL statement (as alternative to open a web browser) to see if we get a response back from our Nginx instance:
 
 ``` curl "http://13.92.209.60" ```
 
@@ -173,22 +180,27 @@ Which should result in an output similar to this:
     </html>
 
 
+Yay! Our Nginx load balancer is running!
 
-
-However, in the case above the default configuration is used which is not always desired.
+However, in this case the default configuration is used, which is not always desired. We may want to customize the Nginx configuration to meet our needs.
 
 ### 1.2 Create a custom Nginx configuration for Kubernetes
 
-In order for Kubernetes to start an Nginx instance with **your** configuration, there are a number of steps we need to perform:
+In order for Kubernetes to start an Nginx instance with your **customized** configuration (instead of the default configuration), there are a number of steps we need to perform:
 
-1. We need to create a custom Nginx configuration file
-2. We need to make the custom Nginx configuration file readable to a Kubernetes pod
+1. We need to create a custom Nginx ```.conf``` configuration file
+2. We need to make the custom Nginx configuration file readable to a Kubernetes pod by generating a ```ConfigMap```
 3. We need to reference the Nginx configuration from our Pod and Deployment configuration files (written in Yaml format)
 3. We need to verify that the custom Nginx configuration file is successfully picked up by Kubernetes during deployment
 
-First, we will generate a custom Nginx configuration. As an example we will be creating a simple Nginx implementation that returns a fixed string ```Gangnam Style!``` for all root level HTTP requests. So, the expected result here for a request like this ```http://13.92.209.60``` is ```Gangnam Style!```
+First, we will generate a custom Nginx configuration file. As an example we will be creating a simple Nginx implementation that returns a fixed string ```Gangnam Style!``` for all root level HTTP requests. So, the expected result here for an HTTP request to ```http://13.92.209.60``` is ```Gangnam Style!```
+
+
+> Note: Technically we are not implementing an actual Application Container here, but for simplicity we will be mimicking a web server returning a fixed string ```Gangnam Style!```. In essence the ```location``` definition in the Nginx configuration has become our Application Container in this example.
 
 **Sample custom Nginx configuration** ```nginx-basic.conf```:
+
+The following configuration would route every HTTP request to ```/``` to a ```text/plain``` response with the text ```Gangnam Style!```
 
     server {
     	location / {
@@ -198,7 +210,7 @@ First, we will generate a custom Nginx configuration. As an example we will be c
     }
     
 
-Now, in order for Kubernetes to understand this Nginx-specific configuration, we need to make it readable by creating a ```ConfigMap``` object from this. In essence, a ```ConfigMap``` object is a key-value pair that can be mounted to a volume inside the Kubernetes pod.  
+Now, in order for Kubernetes to understand this Nginx-specific configuration, we need to make it readable by creating a ```ConfigMap``` object from this file. In essence, a ```ConfigMap``` object is a collection of key-value pairs that can be mounted to a volume inside the Kubernetes pod.  
 
 If you'd like you can read more about ```ConfigMap``` here: [https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/ "https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/")
 
@@ -215,10 +227,10 @@ In a working folder of your choice, please create a ```conf.d``` sub-folder. The
 
 And save the file. You should now have a ```nginx-basic.conf``` file in the ```conf.d``` folder.
 
-> Note: Unlike some of the examples on the web, ```ConfigMaps``` must be mounted as directories! Not as files. More about this later.
+> Note: Unlike some of the examples on the web, ```ConfigMaps``` must be mounted as directories! Not as files. This is why the ```nginx-basic.conf``` file has to be placed in a folder.
 > 
 
-> Note: Also, if you more experienced with Nginx configuration files: Nginx configuration for Kubernetes can not contain any top level configuration attributes such as ```http```, ```worker processes```, etc. 
+> Note: Also, if you are more experienced with Nginx configuration files: Nginx configuration for Kubernetes cannot contain any top level configuration attributes such as ```http```, ```worker processes```, etc. You will need to strip those from your ```.conf``` file.
 
 Now, let's run the command that will generate a ```ConfigMap``` for our custom Nginx configuration file:
 
@@ -231,9 +243,9 @@ Now, let's run the command that will generate a ```ConfigMap``` for our custom N
 
 **Reference our custom Nginx configuration from our Pod and Deployment configuration files**
 
-When we construct our Pod and Deployment Yaml files, we need to make sure we reference our custom Nginx configuration correctly, otherwise the deployment may fail or the deployment will succeed, but with the default Nginx configuration. 
+When we construct our Pod and Deployment Yaml files, we need to make sure we reference our custom Nginx configuration correctly, otherwise the deployment may fail or the deployment may succeed, but with the default Nginx configuration. 
 
-As we will see later when constructing the Pod and Deployment Yaml files, you will see a section in your Yaml files similar to this:
+As we will see later when constructing the Pod and Deployment Yaml files, you will need a section in your Yaml files similar to this:
 
     spec:
       containers:
@@ -247,15 +259,21 @@ As we will see later when constructing the Pod and Deployment Yaml files, you wi
           configMap:
             name: basic-config
 > 
-> Note: It is extremely important when constructing Yaml files to follow the exact indentation from the samples for the configuration elements, as Yaml is extremely sensitive to that and your deployment may fail for unclear reasons because of it.
+> Note: It is extremely important when constructing Yaml files to follow the exact indentation from the samples for the configuration elements, as Yaml is extremely sensitive to that and your deployment may fail for unclear reasons because of wrong indentation.
 
 > Note: Also, NO tabs can be used for indentation, only spaces. Make sure your code editor doesn't convert spaces into tabs or adds tabs when adding a carriage return. And also make sure when copy & pasting this code, the indentation isn't changed or replaced by tabs.
 
 ## 2. Create a Kubernetes Pod
 
-In this lab we will be creating a simple load balancing Pod that will return a fixed string for a HTTP request. 
+![](./images/KubernetesAKS.png)
 
-In the paragraph above we learned how to create a custom Nginx configuration to return a fixed string from an Nginx implementation and how to create a ConfigMap that can be read by Kubernetes when deploying your pod.
+**Kubernetes** is an open-source system for automating deployment, scaling and management of containerized applications that was originally designed by Google and now maintained by the Cloud Native Computing Foundation.
+
+**Azure Container Service** (AKS) manages your hosted Kubernetes environment, making it quick and easy to deploy and manage containerized applications without container orchestration expertise
+
+In this lab we will be creating a simple load balancing Pod that will return a fixed string for an HTTP request. 
+
+In the paragraph above we learned how to create a custom Nginx configuration to return a fixed string from an Nginx implementation and how to create a ```ConfigMap``` that can be read by Kubernetes when deploying your pod.
 
 The following Yaml file is used to create our simple load balancing pod:
 
@@ -276,21 +294,21 @@ The following Yaml file is used to create our simple load balancing pod:
             name: basic-config 
 
 
-Then, we ask Kubernetes to generate the pod for us by using the following command:
+Then, we ask Kubernetes to **generate** the pod for us by using the following command:
 
     kubectl create -f basic-pod.yaml
 
 
 ## 3. Deploy a Kubernetes Pod
 
-Now the pod should be defined, however this does not yet actually deploy our pod. For that we need to execute the following command:
+Now the pod should be defined, however this does not yet actually **deploy** our pod. For that we need to execute the following command:
 
 
     kubectl create -f basic-deployment.yaml
 
 ## 4. Expose a Kubernetes Pod Deployment
   
-Now the deployment is created, however we are not there yet. In order for us to access the deployment from the outside world, we need to expose the deployment by using this command:
+Now the deployment is created, however we are not there yet. In order for us to access the deployment from the outside world, we need to **expose** the deployment by using this command:
 
 
     kubectl expose deployment basic-deployment --port=80 --type=LoadBalancer
@@ -316,7 +334,7 @@ The items ```basic-deployment-1236939662-mfq4f``` and ```basic-deployment-123693
 
 The ```basic-pod``` refers to the pod we created with ```basic-pod.yaml```.
 
-Note: if the STATUS is not running, there are several things you can do to debug the issue (see below).
+Note: if the STATUS is not equal to ```Running```, there are several things you can do to debug the issue (see bottom of this page).
 
 ### 5.2 List your deployments
 
@@ -333,13 +351,13 @@ Which will result in an output similar to this:
 
 ## 6. Test the Kubernetes Pod Deployment
 
-Since AKS issued an EXTERNAL-IP as we can see from the output of our  kubectl get services statement, we can now go to a web browser and navigate to http://52.186.69.82  or use cURL to see the output of our load balanced custom Nginx implementation:
+Since AKS issued an EXTERNAL-IP as we can see from the output of our ```kubectl get services``` statement, we can now go to a web browser and navigate to ```http://52.186.69.82```  or use cURL to see the output of our load balanced custom Nginx implementation:
 
     curl "http://52.186.69.82/" 
 
 Which should result in the following output:
 
-    gangnam style!
+    Gangnam Style!
 
         
 
@@ -347,7 +365,7 @@ Which should result in the following output:
 
 Deploying a pod, deployment or a service with Kubernetes can be a daunting task. 
 
-However, here are a few commands that will be able to guide you potential problems with your configuration:
+However, here are a few commands that will be able to guide you to potential problems with your configuration:
 
 ### 7.1. Inspect the active configuration of a pod
 
@@ -363,13 +381,14 @@ Then, by executing the following command, you can get back from Kubernetes the Y
 
     kubectl get pod basic-deployment-1236939662-mfq4f -o yaml
 
-This can give you information on which Nginx configuration is actually used. If the output of the statement above doesn't match the Yaml you provided this may point you in the right direction of solving your issue. 
+This can give you information on which Nginx configuration is **actually** used. If the output of the statement above doesn't match the Yaml you provided this may point you in the right direction of solving your issue. 
 
 ### 7.2. Inspecting the logs of a pod
 
-The following statement returns the logs of a pod:
+The following statement returns the access logs of a pod:
 
-kubectl logs basic-deployment-1236939662-mfq4f
+
+    kubectl logs basic-deployment-1236939662-mfq4f
 
 Which in case the pod is running correctly, returns an output similar to this:
 
@@ -378,8 +397,45 @@ Which in case the pod is running correctly, returns an output similar to this:
 
 If there is something wrong with the pod, deployment or the load balancer, the result from this statement may be an empty string.
 
+### 7.3. Perform a cURL statement INSIDE the pod
+
+If you do not want to wait for an external IP address to be issued to your pod by Azure, you can also enter the pod yourself and perform cURL statements within the pod:
+
+    kubectl run curl-basic-deployment --image=radial/busyboxplus:curl -i --tty --rm
+
+This will fire up a CLI that is running within the pod. Now you can execute a curl statement against the load balancer in the pod:
+
+    If you don't see a command prompt, try pressing enter.
+    [ root@curl-basic-deployment-1042428133-jt8ft:/ ]$
+
+  
+    [ root@curl-basic-deployment-1042428133-jr46z:/ ]$ curl 10.244.0.70
+    Gangnam Style![ root@curl-basic-deployment-1042428133-jr46z:/ ]$
+    
+And there is our expected response! So we know the pod itself is working.
 
 
+### 8. Summary
 
+Here is a summary of the statements that we have executed in order for us to deploy our load balancing pod:
 
+    kubectl create configmap basic-config --from-file=conf.d
+    kubectl create -f basic-pod.yaml
+    kubectl create -f basic-deployment.yaml
+    kubectl expose deployment basic-deployment --port=80 --type=LoadBalancer
+    kubectl get pods --output=wide
+    kubectl get services
+    kubectl get services --watch
+    
+Which you can copy & paste as a whole into a Command Prompt window, which then will be fired one by one.
 
+Here are the statements to tear down the pod, so you can re-run the statements above again:
+    
+    kubectl delete pod basic-pod
+    kubectl delete service basic-deployment
+    kubectl delete configmap basic-config
+    kubectl delete deployment basic-deployment
+
+### 9. Conclusion
+
+In this lab we saw we can easily create a default Nginx load balancing web server with Kubernetes in AKS. Creating a customized Nginx instance requires a bit more effort. We saw we can use Nginx to create a very rudimentary web server. We can test our deployed containers internally without them being exposed to the outside world.
