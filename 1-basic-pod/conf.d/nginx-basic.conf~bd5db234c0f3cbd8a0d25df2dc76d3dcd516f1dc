@@ -1,6 +1,0 @@
-server {
-    location / {
-        return 200 'Gangnam Style!';
-		add_header Content-Type text/plain;
-    }
-}
